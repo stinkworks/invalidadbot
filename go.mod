@@ -1,4 +1,4 @@
-module invcatter/m
+module invcatter
 
 go 1.22.5
 
