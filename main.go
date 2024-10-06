@@ -69,9 +69,9 @@ func handlerHelp(ctx context.Context, telegramBot *bot.Bot, update *models.Updat
 	Text:	"Heya! This bot is mostly made to send cats to people.\n" +
 		"'twas but made by @fecupacufacu; feel free to reach 'em out" +
 		" in Telegram.\n" +
+		"Try some of the following commands:\n" +
 		"/cat (Will send a random cat.)\n" +
-		"/tag type_cat_here (Will search for a cat by the tag you specify.)\n" +
-		"Try some of the following commands:",
+		"/tag type_cat_here (Will search for a cat by the tag you specify.)",
     }); err != nil {
 	log.Print("Couldn't reply to /help or /start command; error: ", err.Error())
     }
@@ -86,7 +86,7 @@ func handlerSendPhoto(ctx context.Context, tgBot *bot.Bot, update *models.Update
 
     }
     */
-    apiResponse, err := http.Get("https://cataas.com/cat/sleepy")
+    apiResponse, err := http.Get("https://cataas.com/cat")
     if err != nil {
 	log.Print("-- Failed to fetch cat; error: ", err.Error())
 	return
@@ -100,7 +100,13 @@ func handlerSendPhoto(ctx context.Context, tgBot *bot.Bot, update *models.Update
 	    Data: apiResponse.Body,
 	},
     }); err != nil {
-	log.Print("-- Couldn't send cat pic; error: ", err.Error(), "\nLength of response in bytes: ", apiResponse.ContentLength)
+	apiResponse.Body.Close()
+	if _, nestedErr := tgBot.SendMessage(ctx, &bot.SendMessageParams{
+	    ChatID:	update.Message.Chat.ID,
+	    Text:	fmt.Sprint("Couldn't send cat pic; error was:\n", err.Error(), "\nLength of response in bytes: ", apiResponse.ContentLength),
+	}); nestedErr != nil {
+	    log.Print("Couldn't give more info on error; error: ", err.Error())
+	}
     } else {
 	log.Print("-- Sent cat successfully!")
     }
@@ -123,6 +129,7 @@ func handlerSendPhotoByTag(ctx context.Context, tgBot *bot.Bot, update *models.U
 	fmt.Sprintf("https://cataas.com/cat/%s", tagToFetch),
     )
     if err != nil {
+	apiResponse.Body.Close()
 	log.Print("-- Failed to fetch cat; error: ", err.Error())
 	return
     }
@@ -135,7 +142,12 @@ func handlerSendPhotoByTag(ctx context.Context, tgBot *bot.Bot, update *models.U
 	    Data: apiResponse.Body,
 	},
     }); err != nil {
-	log.Print("-- Couldn't send cat pic; error: ", err.Error(), "\nLength of response in bytes: ", apiResponse.ContentLength)
+	if _, nestedErr := tgBot.SendMessage(ctx, &bot.SendMessageParams{
+	    ChatID:	update.Message.Chat.ID,
+	    Text:	fmt.Sprint("Couldn't send cat pic; error was:\n", err.Error(), "\nLength of response in bytes: ", apiResponse.ContentLength),
+	}); nestedErr != nil {
+	    log.Print("Couldn't give more info on error; error: ", err.Error())
+	}
     } else  {
 	log.Print(fmt.Sprintf("-- Sent cat by tag '%s' successfully!", tagToFetch))
     }
