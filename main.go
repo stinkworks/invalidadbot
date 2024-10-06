@@ -1,24 +1,27 @@
 package main
 
 import (
-	"context"
-	"log"
-	"os"
-	"strconv"
-	//"net/http"
+    "context"
+    "log"
+    "os"
+    "strconv"
+    "net/http"
 
-	"invcatter/cataas"
+    //"invcatter/cataas"
 
-	"github.com/go-telegram/bot"
-	"github.com/go-telegram/bot/models"
-	"github.com/joho/godotenv"
+    "github.com/go-telegram/bot"
+    "github.com/go-telegram/bot/models"
+    "github.com/joho/godotenv"
 )
 
 func main() {
     botOptions := []bot.Option{
-	bot.WithDefaultHandler(handlerSendPhoto),
+	//bot.WithDefaultHandler(handlerSendPhoto),
+	bot.WithMessageTextHandler("/cat", bot.MatchTypeExact, handlerSendPhoto),
 	bot.WithMessageTextHandler("/help", bot.MatchTypeExact, handlerHelp),
 	bot.WithMessageTextHandler("/start", bot.MatchTypeExact, handlerHelp),
+	//bot.WithMessageTextHandler("/tag", bot.MatchTypeExact, handlerHelp),
+	//bot.WithMessageTextHandler("/id", bot.MatchTypeExact, handlerHelp),
     }
 
     TelegramBot := initializeBot(botOptions)
@@ -53,7 +56,7 @@ func initializeBot(options []bot.Option) *bot.Bot {
 func handlerHelp(ctx context.Context, telegramBot *bot.Bot, update *models.Update) {
     if update.Message.Text == "/start" {
 	log.Printf(
-	    "-- Chat ID: %s -- /start command received",
+	    "-- Chat ID: %s; /start command received",
 	    strconv.FormatInt(update.Message.Chat.ID, 10),
 	)
     }
@@ -62,16 +65,36 @@ func handlerHelp(ctx context.Context, telegramBot *bot.Bot, update *models.Updat
 	ChatID:	update.Message.Chat.ID,
 	Text:	"Heya! This bot is mostly made to send cats to people.\n" +
 		"'twas but made by @fecupacufacu; feel free to reach 'em out" +
-		"in Telegram.",
+		" in Telegram.",
     }); err != nil {
 	log.Print("Couldn't reply to /help or /start command; error: ", err.Error())
     }
 }
 
-func handlerSendPhoto(ctx context.Context, bot *bot.Bot, update *models.Update) {
+func handlerSendPhoto(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
+    // TODO: Set actual logic whenever the message is a reply lmao
+    /*
     if update.Message.ReplyToMessage != nil {
-	
+	handlerSendPhoto(ctx, bot, update)
     } else {
 
     }
+    */
+    apiResponse, err := http.Get("https://cataas.com/cat/sleepy")
+    if err != nil {
+	log.Print("-- Failed to fetch cat; error: ", err.Error())
+	return
+    }
+    defer apiResponse.Body.Close()
+
+
+    if _, err := tgBot.SendPhoto(ctx, &bot.SendPhotoParams{
+	ChatID:	update.Message.Chat.ID,
+	Photo: &models.InputFileUpload{
+	    Data: apiResponse.Body,
+	},
+    }); err != nil {
+	log.Print("-- Couldn't send cat pic; error: ", err.Error(), "\nLength of response in bytes: ", apiResponse.ContentLength)
+    }
+
 }
