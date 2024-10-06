@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"regexp"
+	"strings"
 
 	//"invcatter/cataas"
 
@@ -123,7 +124,7 @@ func handlerSendPhotoByTag(ctx context.Context, tgBot *bot.Bot, update *models.U
     }
     */
 
-    tagToFetch := regexp.MustCompile(`^\/tag `).ReplaceAllString(update.Message.Text, `${1}`)
+    tagToFetch := strings.TrimSpace(regexp.MustCompile(`^\/tag `).ReplaceAllString(update.Message.Text, `${1}`))
     log.Print(fmt.Sprintf("-- Fetching cat by tag: %s", tagToFetch))
     apiResponse, err := http.Get(
 	fmt.Sprintf("https://cataas.com/cat/%s", tagToFetch),
