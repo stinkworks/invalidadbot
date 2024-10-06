@@ -1,23 +1,26 @@
 package main
 
 import (
-    "context"
-    "log"
-    "os"
-    "strconv"
-    "net/http"
+	"context"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"strconv"
+	"regexp"
 
-    //"invcatter/cataas"
+	//"invcatter/cataas"
 
-    "github.com/go-telegram/bot"
-    "github.com/go-telegram/bot/models"
-    "github.com/joho/godotenv"
+	"github.com/go-telegram/bot"
+	"github.com/go-telegram/bot/models"
+	"github.com/joho/godotenv"
 )
 
 func main() {
     botOptions := []bot.Option{
 	//bot.WithDefaultHandler(handlerSendPhoto),
 	bot.WithMessageTextHandler("/cat", bot.MatchTypeExact, handlerSendPhoto),
+	bot.WithMessageTextHandler("/tag", bot.MatchTypePrefix, handlerSendPhotoByTag),
 	bot.WithMessageTextHandler("/help", bot.MatchTypeExact, handlerHelp),
 	bot.WithMessageTextHandler("/start", bot.MatchTypeExact, handlerHelp),
 	//bot.WithMessageTextHandler("/tag", bot.MatchTypeExact, handlerHelp),
@@ -65,7 +68,10 @@ func handlerHelp(ctx context.Context, telegramBot *bot.Bot, update *models.Updat
 	ChatID:	update.Message.Chat.ID,
 	Text:	"Heya! This bot is mostly made to send cats to people.\n" +
 		"'twas but made by @fecupacufacu; feel free to reach 'em out" +
-		" in Telegram.",
+		" in Telegram.\n" +
+		"/cat (Will send a random cat.)\n" +
+		"/tag type_cat_here (Will search for a cat by the tag you specify.)\n" +
+		"Try some of the following commands:",
     }); err != nil {
 	log.Print("Couldn't reply to /help or /start command; error: ", err.Error())
     }
@@ -95,6 +101,43 @@ func handlerSendPhoto(ctx context.Context, tgBot *bot.Bot, update *models.Update
 	},
     }); err != nil {
 	log.Print("-- Couldn't send cat pic; error: ", err.Error(), "\nLength of response in bytes: ", apiResponse.ContentLength)
+    } else {
+	log.Print("-- Sent cat successfully!")
+    }
+
+}
+
+func handlerSendPhotoByTag(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
+    // TODO: Set actual logic whenever the message is a reply lmao
+    /*
+    if update.Message.ReplyToMessage != nil {
+	handlerSendPhoto(ctx, bot, update)
+    } else {
+
+    }
+    */
+
+    tagToFetch := regexp.MustCompile(`^\/tag `).ReplaceAllString(update.Message.Text, `${1}`)
+    log.Print(fmt.Sprintf("-- Fetching cat by tag: %s", tagToFetch))
+    apiResponse, err := http.Get(
+	fmt.Sprintf("https://cataas.com/cat/%s", tagToFetch),
+    )
+    if err != nil {
+	log.Print("-- Failed to fetch cat; error: ", err.Error())
+	return
+    }
+    defer apiResponse.Body.Close()
+
+
+    if _, err := tgBot.SendPhoto(ctx, &bot.SendPhotoParams{
+	ChatID:	update.Message.Chat.ID,
+	Photo: &models.InputFileUpload{
+	    Data: apiResponse.Body,
+	},
+    }); err != nil {
+	log.Print("-- Couldn't send cat pic; error: ", err.Error(), "\nLength of response in bytes: ", apiResponse.ContentLength)
+    } else  {
+	log.Print(fmt.Sprintf("-- Sent cat by tag '%s' successfully!", tagToFetch))
     }
 
 }
