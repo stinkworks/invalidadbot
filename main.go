@@ -125,6 +125,16 @@ func handlerSendPhotoByTag(ctx context.Context, tgBot *bot.Bot, update *models.U
     */
 
     tagToFetch := strings.TrimSpace(regexp.MustCompile(`^\/tag `).ReplaceAllString(update.Message.Text, `${1}`))
+    if tagToFetch == "" {
+	if _, nestedErr := tgBot.SendMessage(ctx, &bot.SendMessageParams{
+	    ChatID:	update.Message.Chat.ID,
+	    Text:	"What are you, nuts?\nYou didn't type in a tag.",
+	}); nestedErr != nil {
+	    log.Print("Couldn't give more info on error; error: ", nestedErr.Error())
+	}
+	return
+    }
+
     log.Print(fmt.Sprintf("-- Fetching cat by tag: %s", tagToFetch))
     apiResponse, err := http.Get(
 	fmt.Sprintf("https://cataas.com/cat/%s", tagToFetch),
