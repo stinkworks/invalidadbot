@@ -125,7 +125,7 @@ func handlerSendPhotoByTag(ctx context.Context, tgBot *bot.Bot, update *models.U
     */
 
     tagToFetch := strings.TrimSpace(regexp.MustCompile(`^\/tag `).ReplaceAllString(update.Message.Text, `${1}`))
-    if tagToFetch == "" {
+    if tagToFetch == "/tag" {
 	if _, nestedErr := tgBot.SendMessage(ctx, &bot.SendMessageParams{
 	    ChatID:	update.Message.Chat.ID,
 	    Text:	"What are you, nuts?\nYou didn't type in a tag.",
