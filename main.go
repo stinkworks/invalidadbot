@@ -139,7 +139,21 @@ func handlerSendPhotoByTag(ctx context.Context, tgBot *bot.Bot, update *models.U
     apiResponse, err := http.Get(
 	fmt.Sprintf("https://cataas.com/cat/%s", tagToFetch),
     )
-    if err != nil {
+    if apiResponse.StatusCode != http.StatusOK {
+	statusCatResponse, _ := http.Get(
+		fmt.Sprintf("https://http.cat/%s", strconv.Itoa(apiResponse.StatusCode)),
+	)
+	tgBot.SendPhoto(ctx, &bot.SendPhotoParams{
+	    ChatID: update.Message.Chat.ID,
+	    Photo: &models.InputFileUpload{
+		Data: statusCatResponse.Body,
+	    },
+	})
+	apiResponse.Body.Close()
+	statusCatResponse.Body.Close()
+	log.Print("-- Failed to fetch cat; status wasn't 200 OK but: ", apiResponse.Status)
+	return
+    } else if err != nil {
 	apiResponse.Body.Close()
 	log.Print("-- Failed to fetch cat; error: ", err.Error())
 	return
