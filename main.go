@@ -192,7 +192,6 @@ func handlerGroupMessage(ctx context.Context, tgBot *bot.Bot, update *models.Upd
 			return
 		}
 
-
 		// Check if the chat ID matches the specified chat ID
 		if strconv.FormatInt(update.Message.Chat.ID, 10) == specifiedChatID {
 			// Prepare the JSON payload
@@ -222,19 +221,28 @@ func handlerGroupMessage(ctx context.Context, tgBot *bot.Bot, update *models.Upd
 			// Check the threat probability
 			if response.ThreatProbability >= 85 {
 				// Notify the chat about the message deletion
-				tgBot.SendMessage(ctx, &bot.SendMessageParams{
+				replyMessage, err := tgBot.SendMessage(ctx, &bot.SendMessageParams{
 					ChatID: update.Message.Chat.ID,
 					Text:   "Warning: This message will be deleted in 15 seconds due to high threat probability.",
 				})
+				if err != nil {
+					log.Print("Failed to send warning message; error: ", err.Error())
+				}
 
 				// Run the deletion in a goroutine
 				go func() {
 					time.Sleep(15 * time.Second)
 
-					// Delete the message
+					// Delete the original message
 					tgBot.DeleteMessage(ctx, &bot.DeleteMessageParams{
 						ChatID:    update.Message.Chat.ID,
 						MessageID: update.Message.ID,
+					})
+
+					// Delete the warning message
+					tgBot.DeleteMessage(ctx, &bot.DeleteMessageParams{
+						ChatID:    update.Message.Chat.ID,
+						MessageID: replyMessage.ID,
 					})
 				}()
 			}
