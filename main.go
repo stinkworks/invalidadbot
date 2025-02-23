@@ -26,7 +26,7 @@ func main() {
 		bot.WithMessageTextHandler("/tag", bot.MatchTypePrefix, handlerSendPhotoByTag),
 		bot.WithMessageTextHandler("/help", bot.MatchTypeExact, handlerHelp),
 		bot.WithMessageTextHandler("/start", bot.MatchTypeExact, handlerHelp),
-		bot.WithMessageTextHandler("", bot.MatchTypeContains, handlerMessage),
+		bot.WithMessageTextHandler("", bot.MatchTypeContains, handlerGroupMessage),
 	}
 
 	TelegramBot := initializeBot(botOptions)
@@ -177,7 +177,7 @@ func handlerSendPhotoByTag(ctx context.Context, tgBot *bot.Bot, update *models.U
 
 }
 
-func handlerMessage(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
+func handlerGroupMessage(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
 	// Regular expression to match x.com URLs
 	twitterRegex := regexp.MustCompile(`https?://(?:www\.)?x\.com/[^/]+/status/[0-9]+`)
 	// Find all matches in the message
@@ -192,6 +192,7 @@ func handlerMessage(ctx context.Context, tgBot *bot.Bot, update *models.Update) 
 			return
 		}
 
+
 		// Check if the chat ID matches the specified chat ID
 		if strconv.FormatInt(update.Message.Chat.ID, 10) == specifiedChatID {
 			// Prepare the JSON payload
@@ -199,6 +200,9 @@ func handlerMessage(ctx context.Context, tgBot *bot.Bot, update *models.Update) 
 
 			// Send the message to the specified localhost endpoint
 			endpoint := os.Getenv("CUMCEN_ENDPOINT")
+			if !strings.HasPrefix(endpoint, "http://") {
+				endpoint = "http://" + endpoint
+			}
 			resp, err := http.Post(endpoint, "application/json", strings.NewReader(messagePayload))
 			if err != nil {
 				log.Print("Failed to send message to localhost; error: ", err.Error())
