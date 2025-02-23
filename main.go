@@ -219,11 +219,15 @@ func handlerGroupMessage(ctx context.Context, tgBot *bot.Bot, update *models.Upd
 			}
 
 			// Check the threat probability
-			if response.ThreatProbability >= 85 {
+			if response.ThreatProbability >= os.Getenv("THREAT_THRESHOLD") {
 				// Notify the chat about the message deletion
 				replyMessage, err := tgBot.SendMessage(ctx, &bot.SendMessageParams{
 					ChatID: update.Message.Chat.ID,
 					Text:   "Warning: This message will be deleted in 15 seconds due to high threat probability.",
+					ReplyParameters: &models.ReplyParameters{
+						MessageID: update.Message.ID,
+						ChatID:    update.Message.Chat.ID,
+					},
 				})
 				if err != nil {
 					log.Print("Failed to send warning message; error: ", err.Error())
