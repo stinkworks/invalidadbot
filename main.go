@@ -32,26 +32,26 @@ func main() {
 	TelegramBot := initializeBot(botOptions)
 	telegramContext, cancelContext := context.WithCancel(context.Background())
 	if telegramContext == nil {
-		log.Fatal(`Just how the hell did you mess up?
-            There is no context for the bot; exiting now.`)
+		log.Fatal(throwError(3, fmt.Errorf("missing context for bot")))
 	}
 	TelegramBot.Start(telegramContext)
 	defer cancelContext()
 }
 
+
 func initializeBot(options []bot.Option) *bot.Bot {
 	if err := godotenv.Load(); err != nil {
-		log.Fatal("-- Couldn't load .env file; error: ", err.Error())
+		log.Fatal(throwError(1, err))
 	}
 
 	telegramApiToken, found := os.LookupEnv("API_TOKEN")
 	if !found {
-		log.Fatal("-- Couldn't load API_TOKEN variable from .env; exiting now.")
+		log.Fatal(throwError(2, fmt.Errorf("API_TOKEN not found")))
 	}
 
 	b, err := bot.New(telegramApiToken, options...)
 	if err != nil {
-		log.Fatal("-- Couldn't construct Telegram bot object; error: ", err.Error())
+		log.Fatal(throwError(3, err))
 	}
 
 	return b
@@ -59,35 +59,55 @@ func initializeBot(options []bot.Option) *bot.Bot {
 
 func handlerHelp(ctx context.Context, telegramBot *bot.Bot, update *models.Update) {
 	if update.Message.Text == "/start" {
-		log.Printf(
-			"-- Chat ID: %s; /start command received",
-			strconv.FormatInt(update.Message.Chat.ID, 10),
-		)
+		log.Printf("-- Chat ID: %s; /start command received", strconv.FormatInt(update.Message.Chat.ID, 10))
 	}
 
 	if _, err := telegramBot.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
 		Text: "Heya! This bot is mostly made to send cats to people.\n" +
-			"'twas but made by @effygp; feel free to reach 'em out" +
-			" in Telegram.\n" +
+			"'twas but made by @effygp; feel free to reach 'em out in Telegram.\n" +
 			"Try some of the following commands:\n" +
 			"/cat (Will send a random cat.)\n" +
 			"/tag type_cat_here (Will search for a cat by the tag you specify.)",
 	}); err != nil {
-		log.Print("Couldn't reply to /help or /start command; error: ", err.Error())
+		log.Print(throwError(4, err))
 	}
 }
 
 func handlerSendPhoto(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
-	
+	// if it's a reply, send a cat pic
 	if isReply(update) {
-		// if is a reply, send a totally random cat as a quote to the replied message
-		log.Print("-- Detected Reply: fetching random cat from:" + "https://cataas.com/cat")
+		log.Print("-- Detected Reply: fetching random cat from https://cataas.com/cat")
 		apiResponse, err := http.Get("https://cataas.com/cat")
+		if err != nil {
+			log.Print(throwError(5, err))
+			return
+		}
+		defer apiResponse.Body.Close()
+
+		if _, err := tgBot.SendPhoto(ctx, &bot.SendPhotoParams{
+			ChatID: update.Message.Chat.ID,
+			Photo: &models.InputFileUpload{
+				Data: apiResponse.Body,
+			},
+		}); err != nil {
+			log.Print(throwError(6, err))
+			if _, nestedErr := tgBot.SendMessage(ctx, &bot.SendMessageParams{
+				ChatID: update.Message.Chat.ID,
+				Text: fmt.Sprintf("Couldn't send cat pic; error was:\n%s\nLength of response in bytes: %d",
+					err.Error(), apiResponse.ContentLength),
+			}); nestedErr != nil {
+				log.Print(throwError(6, nestedErr))
+			}
+		} else {
+			log.Print("-- Sent cat successfully!")
+		}
+		return
 	}
+
 	apiResponse, err := http.Get("https://cataas.com/cat")
 	if err != nil {
-		log.Print("-- Failed to fetch cat; error: ", err.Error())
+		log.Print(throwError(5, err))
 		return
 	}
 	defer apiResponse.Body.Close()
@@ -98,17 +118,17 @@ func handlerSendPhoto(ctx context.Context, tgBot *bot.Bot, update *models.Update
 			Data: apiResponse.Body,
 		},
 	}); err != nil {
-		apiResponse.Body.Close()
+		log.Print(throwError(6, err))
 		if _, nestedErr := tgBot.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   fmt.Sprint("Couldn't send cat pic; error was:\n", err.Error(), "\nLength of response in bytes: ", apiResponse.ContentLength),
+			Text: fmt.Sprintf("Couldn't send cat pic; error was:\n%s\nLength of response in bytes: %d",
+				err.Error(), apiResponse.ContentLength),
 		}); nestedErr != nil {
-			log.Print("Couldn't give more info on error; error: ", err.Error())
+			log.Print(throwError(6, nestedErr))
 		}
 	} else {
 		log.Print("-- Sent cat successfully!")
 	}
-
 }
 
 func handlerSendPhotoByTag(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
@@ -118,19 +138,15 @@ func handlerSendPhotoByTag(ctx context.Context, tgBot *bot.Bot, update *models.U
 			ChatID: update.Message.Chat.ID,
 			Text:   "What are you, nuts?\nYou didn't type in a tag.",
 		}); nestedErr != nil {
-			log.Print("Couldn't give more info on error; error: ", nestedErr.Error())
+			log.Print(throwError(7, nestedErr))
 		}
 		return
 	}
 
 	log.Print(fmt.Sprintf("-- Fetching cat by tag: %s", tagToFetch))
-	apiResponse, err := http.Get(
-		fmt.Sprintf("https://cataas.com/cat/%s", tagToFetch),
-	)
+	apiResponse, err := http.Get(fmt.Sprintf("https://cataas.com/cat/%s", tagToFetch))
 	if apiResponse.StatusCode != http.StatusOK {
-		statusCatResponse, _ := http.Get(
-			fmt.Sprintf("https://http.cat/%s", strconv.Itoa(apiResponse.StatusCode)),
-		)
+		statusCatResponse, _ := http.Get(fmt.Sprintf("https://http.cat/%s", strconv.Itoa(apiResponse.StatusCode)))
 		tgBot.SendPhoto(ctx, &bot.SendPhotoParams{
 			ChatID: update.Message.Chat.ID,
 			Photo: &models.InputFileUpload{
@@ -139,11 +155,11 @@ func handlerSendPhotoByTag(ctx context.Context, tgBot *bot.Bot, update *models.U
 		})
 		apiResponse.Body.Close()
 		statusCatResponse.Body.Close()
-		log.Print("-- Failed to fetch cat; status wasn't 200 OK but: ", apiResponse.Status)
+		log.Print(throwError(8, fmt.Errorf("status code %d", apiResponse.StatusCode)))
 		return
 	} else if err != nil {
 		apiResponse.Body.Close()
-		log.Print("-- Failed to fetch cat; error: ", err.Error())
+		log.Print(throwError(5, err))
 		return
 	}
 	defer apiResponse.Body.Close()
@@ -156,44 +172,39 @@ func handlerSendPhotoByTag(ctx context.Context, tgBot *bot.Bot, update *models.U
 	}); err != nil {
 		if _, nestedErr := tgBot.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
-			Text:   fmt.Sprint("Couldn't send cat pic; error was:\n", err.Error(), "\nLength of response in bytes: ", apiResponse.ContentLength),
+			Text: fmt.Sprintf("Couldn't send cat pic; error was:\n%s\nLength of response in bytes: %d",
+				err.Error(), apiResponse.ContentLength),
 		}); nestedErr != nil {
-			log.Print("Couldn't give more info on error; error: ", err.Error())
+			log.Print(throwError(6, nestedErr))
 		}
 	} else {
 		log.Print(fmt.Sprintf("-- Sent cat by tag '%s' successfully!", tagToFetch))
 	}
-
 }
 
 func handlerGroupMessage(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
-	// Regular expression to match x.com URLs
+	// Regex for Twitter URLs, this regex does that it only matches URLs from x.com
 	twitterRegex := regexp.MustCompile(`https?://(?:www\.)?x\.com/[^/]+/status/[0-9]+`)
-	// Find all matches in the message
 	matches := twitterRegex.FindAllString(update.Message.Text, -1)
 
-	// Check if the message is from a group chat and contains the specified chat ID
+	// if the message is from a group or supergroup, and the chat ID matches the specified chat ID
 	if update.Message.Chat.Type == "group" || update.Message.Chat.Type == "supergroup" {
-		// Get the chat ID from the environment variable
 		specifiedChatID := os.Getenv("CENSORED_CHAT_ID")
 		if specifiedChatID == "" {
-			log.Print("SPECIFIED_CHAT_ID environment variable is not set.")
+			log.Print(throwError(9, fmt.Errorf("missing CENSORED_CHAT_ID")))
 			return
 		}
 
-		// Check if the chat ID matches the specified chat ID
+		// if the chat ID matches the specified chat ID, send the message
 		if strconv.FormatInt(update.Message.Chat.ID, 10) == specifiedChatID {
-			// Prepare the JSON payload
 			messagePayload := fmt.Sprintf(`{"message": "%s"}`, update.Message.Text)
-
-			// Send the message to the specified localhost endpoint
 			endpoint := os.Getenv("CUMCEN_ENDPOINT")
 			if !strings.HasPrefix(endpoint, "http://") {
 				endpoint = "http://" + endpoint
 			}
 			resp, err := http.Post(endpoint, "application/json", strings.NewReader(messagePayload))
 			if err != nil {
-				log.Print("Failed to send message to localhost; error: ", err.Error())
+				log.Print(throwError(10, err))
 				return
 			}
 			defer resp.Body.Close()
@@ -203,13 +214,12 @@ func handlerGroupMessage(ctx context.Context, tgBot *bot.Bot, update *models.Upd
 				ThreatProbability float64 `json:"threat_probability"`
 			}
 			if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-				log.Print("Failed to decode response; error: ", err.Error())
+				log.Print(throwError(11, err))
 				return
 			}
 
-			// Check the threat probability
-			if response.ThreatProbability >= os.Getenv("THREAT_THRESHOLD") {
-				// Notify the chat about the message deletion
+			// Threat prolly detected 
+			if response.ThreatProbability >= 0 {
 				replyMessage, err := tgBot.SendMessage(ctx, &bot.SendMessageParams{
 					ChatID: update.Message.Chat.ID,
 					Text:   "Warning: This message will be deleted in 15 seconds due to high threat probability.",
@@ -219,20 +229,15 @@ func handlerGroupMessage(ctx context.Context, tgBot *bot.Bot, update *models.Upd
 					},
 				})
 				if err != nil {
-					log.Print("Failed to send warning message; error: ", err.Error())
+					log.Print(throwError(12, err))
 				}
 
-				// Run the deletion in a goroutine
 				go func() {
 					time.Sleep(15 * time.Second)
-
-					// Delete the original message
 					tgBot.DeleteMessage(ctx, &bot.DeleteMessageParams{
 						ChatID:    update.Message.Chat.ID,
 						MessageID: update.Message.ID,
 					})
-
-					// Delete the warning message
 					tgBot.DeleteMessage(ctx, &bot.DeleteMessageParams{
 						ChatID:    update.Message.Chat.ID,
 						MessageID: replyMessage.ID,
@@ -243,6 +248,7 @@ func handlerGroupMessage(ctx context.Context, tgBot *bot.Bot, update *models.Upd
 		}
 	}
 
+	// if the message contains a Twitter URL, replace the URL with a better one
 	if len(matches) > 0 {
 		replacedLinks := make([]string, len(matches))
 		for i, match := range matches {
@@ -266,4 +272,39 @@ func handlerGroupMessage(ctx context.Context, tgBot *bot.Bot, update *models.Upd
 
 func isReply(update *models.Update) bool {
 	return update.Message.ReplyToMessage != nil && update.Message.ReplyToMessage != nil
+}
+
+// throwError is a function that returns an error with a specific error message
+// based on the errorID provided
+func throwError(errorID int, err error) error {
+	var errorMessage string
+	switch errorID {
+	case 1:
+		errorMessage = "Couldn't load .env file"
+	case 2:
+		errorMessage = "Couldn't load API_TOKEN variable from .env"
+	case 3:
+		errorMessage = "Couldn't construct Telegram bot object"
+	case 4:
+		errorMessage = "Couldn't reply to /help or /start command"
+	case 5:
+		errorMessage = "Failed to fetch cat"
+	case 6:
+		errorMessage = "Couldn't send cat pic"
+	case 7:
+		errorMessage = "You didn't type in a tag"
+	case 8:
+		errorMessage = "Failed to fetch cat by tag; status wasn't 200 OK"
+	case 9:
+		errorMessage = "SPECIFIED_CHAT_ID environment variable is not set"
+	case 10:
+		errorMessage = "Failed to send message to localhost"
+	case 11:
+		errorMessage = "Failed to decode response"
+	case 12:
+		errorMessage = "Failed to send warning message"
+	default:
+		errorMessage = "Unknown error occurred"
+	}
+	return fmt.Errorf("Error [%d]: %s; %w", errorID, errorMessage, err)
 }
