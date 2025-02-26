@@ -79,14 +79,7 @@ func handlerHelp(ctx context.Context, telegramBot *bot.Bot, update *models.Updat
 }
 
 func handlerSendPhoto(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
-	// TODO: Set actual logic whenever the message is a reply lmao
-	/*
-		    if update.Message.ReplyToMessage != nil {
-			handlerSendPhoto(ctx, bot, update)
-		    } else {
-
-		    }
-	*/
+	
 	apiResponse, err := http.Get("https://cataas.com/cat")
 	if err != nil {
 		log.Print("-- Failed to fetch cat; error: ", err.Error())
@@ -114,15 +107,6 @@ func handlerSendPhoto(ctx context.Context, tgBot *bot.Bot, update *models.Update
 }
 
 func handlerSendPhotoByTag(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
-	// TODO: Set actual logic whenever the message is a reply lmao
-	/*
-		    if update.Message.ReplyToMessage != nil {
-			handlerSendPhoto(ctx, bot, update)
-		    } else {
-
-		    }
-	*/
-
 	tagToFetch := strings.TrimSpace(regexp.MustCompile(`^\/tag `).ReplaceAllString(update.Message.Text, `${1}`))
 	if tagToFetch == "/tag" {
 		if _, nestedErr := tgBot.SendMessage(ctx, &bot.SendMessageParams{
@@ -273,4 +257,8 @@ func handlerGroupMessage(ctx context.Context, tgBot *bot.Bot, update *models.Upd
 			log.Printf("Failed to send vxtwitter link: %v", err)
 		}
 	}
+}
+
+func isReply(update *models.Update) bool {
+	return update.Message.ReplyToMessage != nil && update.Message.ReplyToMessage != nil
 }
