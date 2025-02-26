@@ -79,7 +79,7 @@ func handlerHelp(ctx context.Context, telegramBot *bot.Bot, update *models.Updat
 }
 
 func handlerSendPhoto(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
-	
+
 	apiResponse, err := http.Get("https://cataas.com/cat")
 	if err != nil {
 		log.Print("-- Failed to fetch cat; error: ", err.Error())
@@ -234,7 +234,6 @@ func handlerGroupMessage(ctx context.Context, tgBot *bot.Bot, update *models.Upd
 					})
 				}()
 			}
-			return
 		}
 	}
 
