@@ -81,7 +81,7 @@ func handlerHelp(ctx context.Context, telegramBot *bot.Bot, update *models.Updat
 func handlerSendPhoto(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
 	
 	if isReply(update) {
-		// if is a reply, send a totally random cat as a quote to the replied message
+		// If update is a reply to an Invalidadbot message, send a totally random cat as a quote to the replied message.
 		log.Print("-- Detected Reply: fetching random cat from:" + "https://cataas.com/cat")
 		apiResponse, err := http.Get("https://cataas.com/cat")
 	}
