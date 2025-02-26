@@ -203,7 +203,8 @@ func handlerGroupMessage(ctx context.Context, tgBot *bot.Bot, update *models.Upd
 			}
 
 			// Check the threat probability
-			if response.ThreatProbability >= os.Getenv("THREAT_THRESHOLD") {
+			threshold, _ := strconv.ParseFloat(os.Getenv("THREAT_THRESHOLD"), 64)
+			if response.ThreatProbability >= threshold {
 				// Notify the chat about the message deletion
 				replyMessage, err := tgBot.SendMessage(ctx, &bot.SendMessageParams{
 					ChatID: update.Message.Chat.ID,
