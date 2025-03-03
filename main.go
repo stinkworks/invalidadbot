@@ -241,7 +241,7 @@ func handlerGroupMessage(ctx context.Context, tgBot *bot.Bot, update *models.Upd
 	if len(matches) > 0 {
 		replacedLinks := make([]string, len(matches))
 		for i, match := range matches {
-			replacedLinks[i] = strings.Replace(match, "x.com/", "girlcockx.com/", 1)
+			replacedLinks[i] = strings.Replace(match, "x.com/", "fixupx.com/", 1)
 		}
 
 		response := "Here's your tweet with better embedding:\n" + strings.Join(replacedLinks, "\n")
