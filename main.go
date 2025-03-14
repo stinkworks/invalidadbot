@@ -26,6 +26,7 @@ func main() {
 		bot.WithMessageTextHandler("/tag", bot.MatchTypePrefix, handlerSendPhotoByTag),
 		bot.WithMessageTextHandler("/help", bot.MatchTypeExact, handlerHelp),
 		bot.WithMessageTextHandler("/start", bot.MatchTypeExact, handlerHelp),
+		bot.WithMessageTextHandler("borralo y grabalo", bot.MatchTypeExact, handlerDeleteMessage),
 		bot.WithMessageTextHandler("", bot.MatchTypeContains, handlerGroupMessage),
 	}
 
@@ -257,6 +258,56 @@ func handlerGroupMessage(ctx context.Context, tgBot *bot.Bot, update *models.Upd
 			log.Printf("Failed to send vxtwitter link: %v", err)
 		}
 	}
+}
+
+func handlerDeleteMessage(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
+	// Check if the message is a reply
+	if !isReply(update) {
+		return
+	}
+
+	// Send notification about upcoming deletion
+	replyMessage, err := tgBot.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID: update.Message.Chat.ID,
+		Text:   "Fine! Deleting the message in 15 seconds.",
+		ReplyParameters: &models.ReplyParameters{
+			MessageID: update.Message.ReplyToMessage.ID,
+			ChatID:    update.Message.Chat.ID,
+		},
+	})
+	if err != nil {
+		log.Print("Failed to send deletion warning message; error: ", err.Error())
+		return
+	}
+
+	// Run the deletion in a goroutine
+	go func() {
+		time.Sleep(15 * time.Second)
+
+		// Delete the target message
+		if _, err := tgBot.DeleteMessage(ctx, &bot.DeleteMessageParams{
+			ChatID:    update.Message.Chat.ID,
+			MessageID: update.Message.ReplyToMessage.ID,
+		}); err != nil {
+			log.Printf("Failed to delete target message: %v", err)
+		}
+
+		// Delete the command message
+		if _, err := tgBot.DeleteMessage(ctx, &bot.DeleteMessageParams{
+			ChatID:    update.Message.Chat.ID,
+			MessageID: update.Message.ID,
+		}); err != nil {
+			log.Printf("Failed to delete command message: %v", err)
+		}
+
+		// Delete the warning message
+		if _, err := tgBot.DeleteMessage(ctx, &bot.DeleteMessageParams{
+			ChatID:    update.Message.Chat.ID,
+			MessageID: replyMessage.ID,
+		}); err != nil {
+			log.Printf("Failed to delete warning message: %v", err)
+		}
+	}()
 }
 
 func isReply(update *models.Update) bool {
